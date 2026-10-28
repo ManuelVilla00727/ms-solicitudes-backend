@@ -15,62 +15,60 @@ public class SolicitudService {
     @Autowired
     private SolicitudRepository repository;
 
-    // 1. CREAR SOLICITUD (Con Validación de Límites)
-    public SolicitudRecuperacion crearSolicitud(Long estudianteId, Long asignaturaId, BigDecimal notaOriginal) {
+    // 1. CREAR SOLICITUD (Ahora recibe 6 parámetros, incluyendo actividadId)
+    public SolicitudRecuperacion crearSolicitud(Long estudianteId, Long asignaturaId, Long actividadId, BigDecimal notaOriginal, String actividadRecuperar, String rutaArchivoSolicitud) {
         
-        // Validar rango de nota
         if (notaOriginal.compareTo(new BigDecimal("0.01")) < 0 || 
            (notaOriginal.compareTo(new BigDecimal("6.99")) > 0 && notaOriginal.compareTo(new BigDecimal("7.01")) < 0) || 
             notaOriginal.compareTo(new BigDecimal("8.99")) > 0) {
-            throw new RuntimeException("Nota no elegible para recuperación (Acuerdo 00082-A).");
+            throw new RuntimeException("Nota no elegible para recuperación.");
         }
 
-        // Determinar tipo (1 = Refuerzo, 2 = Mejora)
         Long tipoId = notaOriginal.compareTo(new BigDecimal("6.99")) <= 0 ? 1L : 2L;
         
-        // VALIDACIÓN DE LÍMITES (Artículos 12 y 13)
         long solicitudesPrevias = repository.countByEstudianteIdAndAsignaturaIdAndTipoRecuperacionId(estudianteId, asignaturaId, tipoId);
         
         if (tipoId == 1L && solicitudesPrevias >= 2) {
-            throw new RuntimeException("Límite excedido: Máximo 2 recuperaciones por Refuerzo Pedagógico para esta asignatura.");
+            throw new RuntimeException("Límite excedido: Máximo 2 recuperaciones por Refuerzo Pedagógico.");
         }
         if (tipoId == 2L && solicitudesPrevias >= 1) {
-            throw new RuntimeException("Límite excedido: Máximo 1 recuperación por Mejora Directa para esta asignatura.");
+            throw new RuntimeException("Límite excedido: Máximo 1 recuperación por Mejora Directa.");
         }
 
         SolicitudRecuperacion solicitud = new SolicitudRecuperacion();
         solicitud.setEstudianteId(estudianteId);
         solicitud.setAsignaturaId(asignaturaId);
+        
+        // Asignamos el nuevo campo ID de Actividad
+        solicitud.setActividadId(actividadId); 
+        
         solicitud.setTipoRecuperacionId(tipoId);
         solicitud.setEstadoId(1L); // PENDIENTE
         solicitud.setNotaObtenidaOriginal(notaOriginal);
         solicitud.setFechaSolicitud(ZonedDateTime.now());
+        
+        // Campos de texto y archivo
+        solicitud.setActividadRecuperar(actividadRecuperar);
+        solicitud.setRutaArchivoSolicitud(rutaArchivoSolicitud);
 
         return repository.save(solicitud);
     }
 
-    // 2. CALIFICAR SOLICITUD (Flujo del Docente)
+    // 2. CALIFICAR SOLICITUD
     public SolicitudRecuperacion calificarSolicitud(Long solicitudId, BigDecimal notaEvaluacion, String comentario) {
         SolicitudRecuperacion solicitud = repository.findById(solicitudId)
                 .orElseThrow(() -> new RuntimeException("Solicitud no encontrada."));
 
         if (solicitud.getEstadoId() == 4L) {
-            throw new RuntimeException("Esta solicitud ya fue calificada y completada.");
+            throw new RuntimeException("Esta solicitud ya fue calificada.");
         }
 
-        // Calcular promedio: (Nota Original + Nota Evaluación) / 2
         BigDecimal suma = solicitud.getNotaObtenidaOriginal().add(notaEvaluacion);
         BigDecimal promedio = suma.divide(new BigDecimal("2"), 2, RoundingMode.HALF_UP);
 
-        // Aplicar el tope del Acuerdo Ministerial
-        BigDecimal notaFinal;
-        if (solicitud.getTipoRecuperacionId() == 1L) {
-            // Refuerzo: tope 7.00
-            notaFinal = promedio.min(new BigDecimal("7.00"));
-        } else {
-            // Mejora Directa: tope 9.00
-            notaFinal = promedio.min(new BigDecimal("9.00"));
-        }
+        BigDecimal notaFinal = (solicitud.getTipoRecuperacionId() == 1L) 
+            ? promedio.min(new BigDecimal("7.00")) 
+            : promedio.min(new BigDecimal("9.00"));
 
         solicitud.setNotaNuevaPropuesta(notaFinal);
         solicitud.setEstadoId(4L); // COMPLETADA
@@ -80,7 +78,13 @@ public class SolicitudService {
         return repository.save(solicitud);
     }
 
+    // 3. LISTAR POR ESTUDIANTE
     public List<SolicitudRecuperacion> listarPorEstudiante(Long estudianteId) {
         return repository.findByEstudianteId(estudianteId);
+    }
+
+    // 4. LISTAR PENDIENTES (Para el Docente)
+    public List<SolicitudRecuperacion> listarPendientes() {
+        return repository.findByEstadoId(1L);
     }
 }

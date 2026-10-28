@@ -19,6 +19,10 @@ public class SolicitudRecuperacion {
     @Column(name = "asignatura_id", nullable = false)
     private Long asignaturaId;
 
+    // NUEVO CAMPO: ID de la Actividad
+    @Column(name = "actividad_id")
+    private Long actividadId;
+
     @Column(name = "tipo_recuperacion_id", nullable = false)
     private Long tipoRecuperacionId;
 
@@ -39,4 +43,10 @@ public class SolicitudRecuperacion {
 
     @Column(name = "comentario_docente")
     private String comentarioDocente;
+
+    @Column(name = "actividad_recuperar")
+    private String actividadRecuperar;
+
+    @Column(name = "ruta_archivo_solicitud")
+    private String rutaArchivoSolicitud;
 }

@@ -7,9 +7,14 @@ import java.util.List;
 
 @Repository
 public interface SolicitudRepository extends JpaRepository<SolicitudRecuperacion, Long> {
+    
+    // 1. Buscar las solicitudes de un estudiante específico
     List<SolicitudRecuperacion> findByEstudianteId(Long estudianteId);
     
-    // Contar cuántas solicitudes tiene el estudiante para una materia y tipo específico
+    // 2. Contar cuántas solicitudes tiene el estudiante (para validar límites)
     long countByEstudianteIdAndAsignaturaIdAndTipoRecuperacionId(
         Long estudianteId, Long asignaturaId, Long tipoRecuperacionId);
+        
+    // 3. NUEVO: Buscar todas las solicitudes por su estado (para el docente)
+    List<SolicitudRecuperacion> findByEstadoId(Long estadoId);
 }
